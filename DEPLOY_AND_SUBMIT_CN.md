@@ -29,7 +29,7 @@
 - 公开仓库地址：`https://github.com/95xp4qk8y5-code/divert-iq`
 - 在线演示地址：`https://95xp4qk8y5-code.github.io/divert-iq/`
 - 在浏览器打开在线演示地址，确认页面正常打开、切换顶部城市（如切换到 Beijing 4-Bin）、点击 6 个测试样本和地图均流畅运行。
-  - *(注：如果 GitHub Pages 刚开启需要等 GitHub Actions 自动构建约 1–2 分钟；若尚未自动部署，进入仓库 `Settings -> Pages`，将 `Source` 设为 `GitHub Actions`，然后在 `Actions` 页点一次 `Run workflow` 即可！)*
+  - *(注：已通过 `gh-pages` 分支自动开启 GitHub Pages 并强制 HTTPS，无需额外配置即可公开访问。)*
 
 ### 第 2 步：在 Devpost 注册加入 Arbiter Hacks V1（3 分钟）
 1. 打开 `https://arbiter-hacks-v1.devpost.com/`，登录或免费注册 Devpost 账号。
