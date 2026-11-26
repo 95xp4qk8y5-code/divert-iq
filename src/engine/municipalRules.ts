@@ -1,0 +1,638 @@
+import {
+  BinCategory,
+  MunicipalityId,
+  MunicipalityProfile,
+  ResolvedWasteRule,
+  WasteItemRule,
+} from './types';
+
+export const MUNICIPALITIES: MunicipalityProfile[] = [
+  {
+    id: 'sf',
+    name: 'San Francisco',
+    region: 'CA, USA',
+    agency: 'SF Environment / Recology',
+    mrfThresholdPct: 10,
+    binLabels: {
+      recycle: 'Blue Cart (Recyclables)',
+      compost: 'Green Cart (Compostables)',
+      landfill: 'Black Cart (Landfill)',
+      hazardous: 'SF HHW Drop-Off / Safe Disposal',
+      dropoff: 'Retail Store Drop-Off',
+    },
+    notes: 'Mandatory three-stream composting accepts soiled food paper, pizza boxes, and compostable fiberware.',
+  },
+  {
+    id: 'nyc',
+    name: 'New York City',
+    region: 'NY, USA',
+    agency: 'NYC DSNY',
+    mrfThresholdPct: 12,
+    binLabels: {
+      recycle: 'Blue / Green Recycling (Metal-Glass-Plastic / Paper)',
+      compost: 'Brown Curbside Composting Bin',
+      landfill: 'Black Trash Bin',
+      hazardous: 'DSNY SAFE Disposal / E-CycleNYC',
+      dropoff: 'Retail Bag & Film Drop-Off',
+    },
+    notes: 'Dual-stream separation splits rigid Metal/Glass/Plastic/Cartons from Mixed Paper & Cardboard.',
+  },
+  {
+    id: 'seattle',
+    name: 'Seattle',
+    region: 'WA, USA',
+    agency: 'Seattle Public Utilities (SPU)',
+    mrfThresholdPct: 10,
+    binLabels: {
+      recycle: 'Blue Recycling Cart',
+      compost: 'Green Food & Yard Waste Cart',
+      landfill: 'Gray Garbage Cart',
+      hazardous: 'King County HazWaste Facility',
+      dropoff: 'Ridwell / Retail Film Drop-Off',
+    },
+    notes: 'Strict anti-contamination enforcement; commercial compost accepts food-soiled paper and BPI-certified compostables.',
+  },
+  {
+    id: 'austin',
+    name: 'Austin',
+    region: 'TX, USA',
+    agency: 'Austin Resource Recovery',
+    mrfThresholdPct: 14,
+    binLabels: {
+      recycle: 'Blue Single-Stream Recycling',
+      compost: 'Green Curbside Composting',
+      landfill: 'Black Trash Cart',
+      hazardous: 'Recycle & Reuse Drop-Off Center',
+      dropoff: 'Retail Plastic Film Bin',
+    },
+    notes: 'Single-stream curbside MRF with strict bans on bagged recyclables, tanglers, and electronics.',
+  },
+  {
+    id: 'beijing',
+    name: 'Beijing (4-Bin)',
+    region: 'China',
+    agency: 'Beijing Municipal Solid Waste Standard',
+    mrfThresholdPct: 12,
+    binLabels: {
+      recycle: 'Blue Bin (可回收物 Recyclables)',
+      compost: 'Green Bin (厨余垃圾 Kitchen Waste)',
+      landfill: 'Gray Bin (其他垃圾 Residual Waste)',
+      hazardous: 'Red Bin (有害垃圾 Hazardous Waste)',
+      dropoff: 'Community Smart Drop-Off / E-Waste Station',
+    },
+    notes: 'Four-stream sorting standard mandates dedicated Red Hazardous bins for batteries, lamps, and expired medicine.',
+  },
+  {
+    id: 'tokyo',
+    name: 'Tokyo (Shibuya/Ward)',
+    region: 'Japan',
+    agency: 'Tokyo 23-Ward Resource Recovery',
+    mrfThresholdPct: 6,
+    binLabels: {
+      recycle: 'Resource Recovery (PET / Cans / Bottles / Paper)',
+      compost: 'Burnable Organics / Ward Compost',
+      landfill: 'Non-Burnable / Residual Waste',
+      hazardous: 'Hazardous Collection Point (Batteries/Bulbs)',
+      dropoff: 'Supermarket Tray & Carton Box',
+    },
+    notes: 'Ultra-low contamination (<6%) requires removing PET labels/caps, rinsing clean, and separating trays.',
+  },
+];
+
+export const WASTE_ITEMS: WasteItemRule[] = [
+  {
+    id: 'aluminum-can',
+    name: 'Aluminum Beverage Can',
+    materialClass: 'aluminum',
+    resinOrCode: 'ALU 41',
+    defaultBin: 'recycle',
+    avgWeightKg: 0.015,
+    co2eSavedKg: 0.151,
+    wishCyclingRisk: 'low',
+    prepSteps: 'Empty completely; quick rinse. Do NOT crush flat if your MRF uses 2D/3D optical sorting.',
+    mrfImpactNote: 'Aluminum has the highest recycling energy savings (~95% vs. virgin smelting) and eddy-current separators recover it reliably.',
+    keywords: ['soda', 'coke', 'beer', 'can', 'aluminum', 'metal', 'drink'],
+  },
+  {
+    id: 'pet-bottle',
+    name: 'Clear PET Water / Soda Bottle (#1)',
+    materialClass: 'pet_clear',
+    resinOrCode: 'PET #1',
+    defaultBin: 'recycle',
+    avgWeightKg: 0.028,
+    co2eSavedKg: 0.033,
+    wishCyclingRisk: 'low',
+    prepSteps: 'Empty liquid, quick rinse, screw cap back on tightly so <2" cap is not lost in MRF screens.',
+    mrfImpactNote: 'Leftover liquid adds weight and soaks cardboard bales; loose small caps fall through trommel screens into landfill residue.',
+    keywords: ['water bottle', 'plastic bottle', 'pet', 'soda bottle', 'clear plastic'],
+    cityOverrides: {
+      tokyo: {
+        bin: 'recycle',
+        note: 'Tokyo wards require peeling off the shrink-wrap label and separating the PP cap into a separate plastics stream.',
+      },
+    },
+  },
+  {
+    id: 'hdpe-milk-jug',
+    name: 'HDPE Milk / Detergent Jug (#2)',
+    materialClass: 'hdpe_opaque',
+    resinOrCode: 'HDPE #2',
+    defaultBin: 'recycle',
+    avgWeightKg: 0.062,
+    co2eSavedKg: 0.053,
+    wishCyclingRisk: 'low',
+    prepSteps: 'Empty & rinse residue; replace cap. Leave label attached.',
+    mrfImpactNote: 'Natural (unpigmented) HDPE #2 commands premium bale value at MRFs when free of dairy spoilage.',
+    keywords: ['milk jug', 'detergent', 'shampoo', 'hdpe', 'jug', 'plastic'],
+  },
+  {
+    id: 'corrugated-cardboard',
+    name: 'Clean Corrugated Cardboard Box',
+    materialClass: 'cardboard',
+    resinOrCode: 'PAP 20',
+    defaultBin: 'recycle',
+    avgWeightKg: 0.42,
+    co2eSavedKg: 1.54,
+    wishCyclingRisk: 'low',
+    prepSteps: 'Remove foam/air pillows, flatten completely, keep dry.',
+    mrfImpactNote: 'Unflattened boxes jam conveyor chutes; wet/greasy fibers break down in hydropulpers and downgrade OCC bales.',
+    keywords: ['amazon box', 'cardboard', 'shipping box', 'parcel', 'carton', 'occ'],
+  },
+  {
+    id: 'greasy-pizza-box',
+    name: 'Greasy / Cheese-Soiled Pizza Box',
+    materialClass: 'contaminated_film',
+    resinOrCode: 'PAP 20 (Soiled)',
+    defaultBin: 'compost',
+    avgWeightKg: 0.24,
+    co2eSavedKg: 0.19,
+    wishCyclingRisk: 'critical',
+    prepSteps: 'Tear off clean top lid for Recycling; put grease-soaked bottom into Compost (or Landfill if no municipal compost).',
+    mrfImpactNote: 'Heavy grease & melted cheese cannot separate from water in paper mills, creating oil spots that ruin entire recycled paper sheets.',
+    keywords: ['pizza', 'pizza box', 'greasy', 'oil', 'cardboard', 'takeout'],
+    cityOverrides: {
+      beijing: {
+        bin: 'landfill',
+        note: 'Beijing 4-Bin classifies oil-soaked paper/cardboard as Gray Residual (其他垃圾), not Kitchen Waste.',
+      },
+      tokyo: {
+        bin: 'compost',
+        note: 'Soiled paper boxes go into Burnable waste in Tokyo wards; clean lids can go to cardboard recovery.',
+      },
+    },
+  },
+  {
+    id: 'plastic-grocery-bag',
+    name: 'Plastic Grocery Bag / LDPE Film (#4)',
+    materialClass: 'contaminated_film',
+    resinOrCode: 'LDPE #4',
+    defaultBin: 'dropoff',
+    avgWeightKg: 0.008,
+    co2eSavedKg: 0.015,
+    wishCyclingRisk: 'critical',
+    prepSteps: 'NEVER place in curbside blue bin! Collect clean & dry bags and bring to supermarket film drop-off bin.',
+    mrfImpactNote: 'Single #1 MRF mechanical hazard: plastic films wrap tightly around spinning star-screens, forcing workers to halt sorting lines 2–4× daily to cut tanglers manually.',
+    keywords: ['plastic bag', 'grocery bag', 'film', 'bubble wrap', 'mailer', 'wrap', 'ldpe'],
+    cityOverrides: {
+      beijing: {
+        bin: 'landfill',
+        note: 'Thin soiled plastic bags go into Gray Residual (其他垃圾) unless clean bulk LDPE recycling is available.',
+      },
+    },
+  },
+  {
+    id: 'coffee-cup-pe',
+    name: 'Disposable Paper Coffee Cup (PE-Lined)',
+    materialClass: 'contaminated_film',
+    resinOrCode: 'C/PAP 81',
+    defaultBin: 'landfill',
+    avgWeightKg: 0.014,
+    co2eSavedKg: 0.012,
+    wishCyclingRisk: 'high',
+    prepSteps: 'Separate cardboard sleeve (Recycle) and #5 plastic lid (check city); cup body goes to Landfill unless certified compostable.',
+    mrfImpactNote: 'Polyethylene waterproof lining fuses plastic to paper fibers, preventing standard paper mills from repulping the cup.',
+    keywords: ['coffee cup', 'starbucks', 'paper cup', 'hot cup', 'boba'],
+    cityOverrides: {
+      seattle: {
+        bin: 'recycle',
+        note: 'Seattle SPU accepts empty poly-coated paper coffee cups in Blue Recycling (remove lid/straw).',
+      },
+      sf: {
+        bin: 'recycle',
+        note: 'San Francisco Recology accepts empty paper coffee cups in Blue Recycling (compostable PLA-lined cups go in Green).',
+      },
+    },
+  },
+  {
+    id: 'black-plastic-tray',
+    name: 'Black Plastic Takeout Container',
+    materialClass: 'contaminated_film',
+    resinOrCode: 'PP #5 / PS #6 (Carbon Black)',
+    defaultBin: 'landfill',
+    avgWeightKg: 0.036,
+    co2eSavedKg: 0.028,
+    wishCyclingRisk: 'high',
+    prepSteps: 'Reuse at home when safe; otherwise dispose in Landfill. Do not wish-cycle black plastic.',
+    mrfImpactNote: 'Carbon-black pigment absorbs near-infrared (NIR) light used by optical MRF sorters, making black trays invisible on dark conveyor belts.',
+    keywords: ['black plastic', 'takeout', 'sushi tray', 'microwave tray', 'meal prep'],
+  },
+  {
+    id: 'lithium-battery',
+    name: 'Lithium-Ion Battery / Vape / Power Bank',
+    materialClass: 'aluminum',
+    resinOrCode: 'Li-Ion HAZ',
+    defaultBin: 'hazardous',
+    avgWeightKg: 0.055,
+    co2eSavedKg: 0.42,
+    wishCyclingRisk: 'critical',
+    prepSteps: 'Tape terminals with clear tape and take to Hazardous Waste / Call2Recycle / electronics retail drop-off. NEVER bin in trash or recycling.',
+    mrfImpactNote: 'Thermal runaway fire hazard: crushed lithium batteries ignite inside collection trucks and MRF bunkers, causing hundreds of facility fires annually.',
+    keywords: ['battery', 'lithium', 'vape', 'power bank', 'phone battery', 'rechargeable'],
+  },
+  {
+    id: 'fresh-food-scraps',
+    name: 'Fruit Peels, Vegetable Scraps & Coffee Grounds',
+    materialClass: 'organics',
+    resinOrCode: 'BIO-ORG',
+    defaultBin: 'compost',
+    avgWeightKg: 0.35,
+    co2eSavedKg: 0.29,
+    wishCyclingRisk: 'medium',
+    prepSteps: 'Remove produce PLU stickers and twist ties before composting.',
+    mrfImpactNote: 'Food scraps in landfill decompose anaerobically to release methane (28× CO2 GWP100); composting converts nutrients into soil amendment.',
+    keywords: ['banana', 'apple', 'food', 'peel', 'scraps', 'coffee grounds', 'vegetables', 'organic', 'produce'],
+  },
+  {
+    id: 'edible-surplus-meal',
+    name: 'Unserved Edible Cafeteria Food',
+    materialClass: 'organics',
+    resinOrCode: 'FOOD-RESCUE',
+    defaultBin: 'compost',
+    avgWeightKg: 1.0,
+    co2eSavedKg: 4.03,
+    wishCyclingRisk: 'high',
+    prepSteps: 'PRIORITY 1: Keep above 60°C or chill below 4°C and dispatch via Food Rescue Router for human donation! Compost only if past food-safety window.',
+    mrfImpactNote: 'Per EPA WARM v16, donating surplus food avoids ~4.03 kg CO2e/kg (upstream agriculture + landfill methane) — 6× higher climate impact than composting!',
+    keywords: ['surplus', 'cafeteria', 'leftover', 'bread', 'meal', 'donation', 'edible'],
+  },
+  {
+    id: 'glass-jar',
+    name: 'Clear / Amber Glass Jar or Bottle',
+    materialClass: 'glass',
+    resinOrCode: 'GL 70-72',
+    defaultBin: 'recycle',
+    avgWeightKg: 0.28,
+    co2eSavedKg: 0.09,
+    wishCyclingRisk: 'low',
+    prepSteps: 'Empty & rinse; metal lid can be removed and recycled separately.',
+    mrfImpactNote: 'Glass is infinitely recyclable, but broken shards contaminate paper bales in single-stream MRFs if not separated cleanly.',
+    keywords: ['glass', 'jar', 'wine bottle', 'jam jar', 'pickle jar'],
+  },
+  {
+    id: 'office-paper',
+    name: 'Clean Office / Notebook Paper & Newspaper',
+    materialClass: 'paper',
+    resinOrCode: 'PAP 22',
+    defaultBin: 'recycle',
+    avgWeightKg: 0.12,
+    co2eSavedKg: 0.48,
+    wishCyclingRisk: 'low',
+    prepSteps: 'Keep dry and flat; staples are fine, remove plastic spiral bindings.',
+    mrfImpactNote: 'High-grade bleached fibers yield strong secondary pulp value when kept dry and unshredded.',
+    keywords: ['paper', 'newspaper', 'notebook', 'homework', 'printer paper', 'mail', 'magazine'],
+  },
+  {
+    id: 'thermal-receipt',
+    name: 'Glossy Thermal Store Receipt',
+    materialClass: 'paper',
+    resinOrCode: 'BPA/BPS Coated',
+    defaultBin: 'landfill',
+    avgWeightKg: 0.002,
+    co2eSavedKg: 0.001,
+    wishCyclingRisk: 'medium',
+    prepSteps: 'Decline printed receipts when possible; place thermal receipts in Landfill, not paper recycling.',
+    mrfImpactNote: 'Coated with BPA/BPS developer chemicals that contaminate recycled tissue and food-contact paperboard pulp.',
+    keywords: ['receipt', 'thermal', 'pos', 'ticket', 'slip'],
+  },
+  {
+    id: 'tetra-pak-carton',
+    name: 'Aseptic Drink Carton / Milk Box (Tetra Pak)',
+    materialClass: 'cardboard',
+    resinOrCode: 'C/PAP 84',
+    defaultBin: 'recycle',
+    avgWeightKg: 0.032,
+    co2eSavedKg: 0.055,
+    wishCyclingRisk: 'medium',
+    prepSteps: 'Empty completely, quick rinse, leave cap on, do NOT insert straw back inside.',
+    mrfImpactNote: 'Multi-layer paperboard/PE/aluminum cartons require specialized hydropulping — accepted in major North American MRFs, excluded in some smaller towns.',
+    keywords: ['tetra pak', 'milk carton', 'juice box', 'oat milk', 'broth carton'],
+    cityOverrides: {
+      tokyo: {
+        bin: 'dropoff',
+        note: 'Rinse, cut open flat, dry, and drop off at supermarket paper-carton collection boxes.',
+      },
+      beijing: {
+        bin: 'recycle',
+        note: 'Accepted in Blue Recyclables (可回收物) once rinsed and flattened.',
+      },
+    },
+  },
+  {
+    id: 'steel-tin-can',
+    name: 'Steel Soup / Food Can',
+    materialClass: 'aluminum',
+    resinOrCode: 'FE 40',
+    defaultBin: 'recycle',
+    avgWeightKg: 0.058,
+    co2eSavedKg: 0.118,
+    wishCyclingRisk: 'low',
+    prepSteps: 'Empty & rinse food residue; tuck sharp lid halfway inside or crimp safely.',
+    mrfImpactNote: 'Overhead belt magnets recover >95% of ferrous steel cans cleanly at MRFs.',
+    keywords: ['tin can', 'soup can', 'beans', 'steel', 'metal can', 'tuna'],
+  },
+  {
+    id: 'styrofoam-eps',
+    name: 'Expanded Polystyrene Foam (Styrofoam #6)',
+    materialClass: 'contaminated_film',
+    resinOrCode: 'PS #6 (EPS)',
+    defaultBin: 'landfill',
+    avgWeightKg: 0.018,
+    co2eSavedKg: 0.014,
+    wishCyclingRisk: 'high',
+    prepSteps: 'Keep out of curbside recycling! Take clean packaging blocks to specialized EPS densifier drop-off if available; food foam goes to Landfill.',
+    mrfImpactNote: '95% air by volume; shatters into static-charged beads in MRF machinery, clinging to glass and fiber bales.',
+    keywords: ['styrofoam', 'foam', 'polystyrene', 'packing peanuts', 'cup noodles', 'eps'],
+  },
+  {
+    id: 'chip-bag-foil',
+    name: 'Metallized Snack / Chip Bag',
+    materialClass: 'contaminated_film',
+    resinOrCode: 'OTHER #7 (Multi-layer)',
+    defaultBin: 'landfill',
+    avgWeightKg: 0.012,
+    co2eSavedKg: 0.01,
+    wishCyclingRisk: 'high',
+    prepSteps: 'Place in Landfill (or specialty TerraCycle program). Not accepted in curbside or store plastic-bag bins.',
+    mrfImpactNote: 'Laminated polypropylene + vaporized aluminum layers cannot be melted together into viable resin pellets.',
+    keywords: ['chip bag', 'chips', 'snack', 'candy wrapper', 'foil pouch', 'doritos'],
+  },
+  {
+    id: 'aluminum-foil-clean',
+    name: 'Clean Aluminum Foil & Pie Pan',
+    materialClass: 'aluminum',
+    resinOrCode: 'ALU 41',
+    defaultBin: 'recycle',
+    avgWeightKg: 0.022,
+    co2eSavedKg: 0.21,
+    wishCyclingRisk: 'medium',
+    prepSteps: 'Wipe clean of food grease and crumple into a fist-sized ball (>5 cm) before recycling.',
+    mrfImpactNote: 'Small flat foil scraps slip through screens or get sorted as paper by air jets; balling clean foil ensures eddy-current capture.',
+    keywords: ['foil', 'tin foil', 'aluminum foil', 'baking tray'],
+    cityOverrides: {
+      tokyo: {
+        bin: 'landfill',
+        note: 'Tokyo wards typically treat household kitchen foil as Non-Burnable or Burnable depending on ward rules, separate from cans.',
+      },
+    },
+  },
+  {
+    id: 'yogurt-tub-pp',
+    name: 'Clean Polypropylene Yogurt / Deli Tub (#5)',
+    materialClass: 'hdpe_opaque',
+    resinOrCode: 'PP #5',
+    defaultBin: 'recycle',
+    avgWeightKg: 0.025,
+    co2eSavedKg: 0.024,
+    wishCyclingRisk: 'low',
+    prepSteps: 'Scrape and quick-rinse; peel off foil lid completely.',
+    mrfImpactNote: 'PP #5 recovery has grown rapidly in modern NIR-equipped MRFs, provided dairy residue is rinsed out.',
+    keywords: ['yogurt', 'butter tub', 'deli container', 'pp', '#5', 'plastic tub'],
+  },
+  {
+    id: 'soiled-napkin',
+    name: 'Food-Soiled Paper Towel / Napkin',
+    materialClass: 'organics',
+    resinOrCode: 'PAP (Soiled)',
+    defaultBin: 'compost',
+    avgWeightKg: 0.009,
+    co2eSavedKg: 0.008,
+    wishCyclingRisk: 'medium',
+    prepSteps: 'Place in Compost if free of chemical cleaning sprays; NEVER put in blue paper recycling.',
+    mrfImpactNote: 'Short virgin/recycled tissue fibers are already too short to repulp and carry grease/microbial contamination.',
+    keywords: ['napkin', 'paper towel', 'tissue', 'kleenex'],
+    cityOverrides: {
+      beijing: {
+        bin: 'landfill',
+        note: 'Beijing 4-Bin routes used tissues and paper towels to Gray Residual (其他垃圾).',
+      },
+    },
+  },
+  {
+    id: 'ewaste-cable',
+    name: 'Broken Charging Cable / Small Electronics',
+    materialClass: 'aluminum',
+    resinOrCode: 'WEEE / E-Waste',
+    defaultBin: 'hazardous',
+    avgWeightKg: 0.18,
+    co2eSavedKg: 0.44,
+    wishCyclingRisk: 'critical',
+    prepSteps: 'Bring to municipal e-waste drop-off or electronics retailer recycling bin (Best Buy / Staples / community e-cycle).',
+    mrfImpactNote: 'Cables are severe "tanglers" that wrap around MRF shafts, while circuit boards contain recoverable copper/gold plus hazardous lead solder.',
+    keywords: ['cable', 'charger', 'usb', 'headphones', 'electronics', 'e-waste', 'cord', 'phone'],
+  },
+  {
+    id: 'pla-compostable-cup',
+    name: 'BPI-Certified Compostable Bioplastic Cup (PLA #7)',
+    materialClass: 'pet_clear',
+    resinOrCode: 'PLA #7 (Bioplastic)',
+    defaultBin: 'compost',
+    avgWeightKg: 0.016,
+    co2eSavedKg: 0.019,
+    wishCyclingRisk: 'critical',
+    prepSteps: 'Verify "BPI Certified Compostable" label and put in Industrial Compost — NEVER mix into PET #1 recycling!',
+    mrfImpactNote: 'Looks identical to clear PET #1 to consumers, but PLA melts at a much lower temperature and ruins an entire batch of recycled PET flakes.',
+    keywords: ['compostable', 'pla', 'bioplastic', 'clear cup', 'cold cup', 'greenware'],
+    cityOverrides: {
+      austin: {
+        bin: 'compost',
+        note: 'Accepted in Austin curbside green cart only if BPI-certified compostable.',
+      },
+      beijing: {
+        bin: 'landfill',
+        note: 'Without industrial PLA separation, route PLA cups to Gray Residual (其他垃圾) rather than Blue PET recycling.',
+      },
+    },
+  },
+  {
+    id: 'ceramic-mug',
+    name: 'Broken Ceramic Mug / Pyrex Dish',
+    materialClass: 'glass',
+    resinOrCode: 'CERAMIC / BOROSILICATE',
+    defaultBin: 'landfill',
+    avgWeightKg: 0.31,
+    co2eSavedKg: 0.0,
+    wishCyclingRisk: 'high',
+    prepSteps: 'Wrap safely in newspaper and dispose in Landfill. Never place in glass recycling.',
+    mrfImpactNote: 'Ceramics and Pyrex have much higher melting points than container glass; even tiny shards form unmelted "stones" that crack newly blown bottles.',
+    keywords: ['ceramic', 'mug', 'plate', 'pyrex', 'mirror', 'window glass', 'porcelain'],
+  },
+  {
+    id: 'shredded-paper',
+    name: 'Shredded Confidential Paper',
+    materialClass: 'paper',
+    resinOrCode: 'PAP 22 (Shredded)',
+    defaultBin: 'compost',
+    avgWeightKg: 0.25,
+    co2eSavedKg: 0.14,
+    wishCyclingRisk: 'high',
+    prepSteps: 'Compost as brown carbon layer, OR bag inside a stapled paper bag if your city explicitly accepts bagged shreds.',
+    mrfImpactNote: 'Loose shredded paper scatters across MRF blowers and falls into broken glass cullet, contaminating both streams.',
+    keywords: ['shredded', 'confetti', 'paper shreds', 'confidential'],
+    cityOverrides: {
+      sf: {
+        bin: 'recycle',
+        note: 'SF Recology accepts shredded paper in Blue Cart ONLY if sealed inside a labeled paper bag.',
+      },
+      beijing: {
+        bin: 'recycle',
+        note: 'Bundle tightly in a paper envelope/bag before placing in Blue Recyclables.',
+      },
+    },
+  },
+  {
+    id: 'rigid-clamshell',
+    name: 'Clear Berry / Salad Plastic Clamshell (#1 Thermoform)',
+    materialClass: 'pet_clear',
+    resinOrCode: 'PET #1 Thermoform',
+    defaultBin: 'recycle',
+    avgWeightKg: 0.032,
+    co2eSavedKg: 0.029,
+    wishCyclingRisk: 'medium',
+    prepSteps: 'Remove absorbent pad & rinse fruit residue; check local MRF thermoform acceptance.',
+    mrfImpactNote: 'Thermoformed PET has different intrinsic viscosity than bottle PET and is rejected by older MRFs if contaminated with berries or pads.',
+    keywords: ['clamshell', 'berry container', 'strawberry', 'salad box', 'thermoform'],
+    cityOverrides: {
+      nyc: {
+        bin: 'recycle',
+        note: 'NYC DSNY accepts clean rigid plastic clamshells in Blue Metal/Glass/Plastic bins.',
+      },
+      tokyo: {
+        bin: 'recycle',
+        note: 'Rinse thoroughly and sort under Plastics Packaging (プラマーク) collection.',
+      },
+    },
+  },
+  {
+    id: 'aerosol-can',
+    name: 'Empty Metal Aerosol Can (Food/Deodorant)',
+    materialClass: 'aluminum',
+    resinOrCode: 'FE 40 / ALU 41',
+    defaultBin: 'recycle',
+    avgWeightKg: 0.085,
+    co2eSavedKg: 0.14,
+    wishCyclingRisk: 'medium',
+    prepSteps: 'Must be 100% empty (no hiss). Remove plastic nozzle cap. If partially pressurized or containing paint/pesticide, treat as Hazardous.',
+    mrfImpactNote: 'Pressurized cans can rupture violently in balers; completely empty cans recycle cleanly as steel or aluminum.',
+    keywords: ['aerosol', 'spray can', 'whipped cream', 'deodorant'],
+    cityOverrides: {
+      tokyo: {
+        bin: 'hazardous',
+        note: 'Tokyo requires completely emptying aerosol cans and setting them in a separate transparent bag on Non-Burnable/Hazardous day.',
+      },
+    },
+  },
+  {
+    id: 'alkaline-battery',
+    name: 'AA / AAA Alkaline Household Battery',
+    materialClass: 'aluminum',
+    resinOrCode: 'BAT-ALK',
+    defaultBin: 'hazardous',
+    avgWeightKg: 0.024,
+    co2eSavedKg: 0.035,
+    wishCyclingRisk: 'medium',
+    prepSteps: 'Collect in a dry jar and bring to community battery drop-off or hazardous waste bin.',
+    mrfImpactNote: 'Even non-lithium cells contain zinc/manganese that recover cleanly through battery smelters and should not enter recycling bales.',
+    keywords: ['aa', 'aaa', 'alkaline', 'battery', 'remote battery'],
+  },
+  {
+    id: 'cereal-box',
+    name: 'Paperboard Cereal / Snack Box',
+    materialClass: 'cardboard',
+    resinOrCode: 'PAP 21',
+    defaultBin: 'recycle',
+    avgWeightKg: 0.085,
+    co2eSavedKg: 0.28,
+    wishCyclingRisk: 'low',
+    prepSteps: 'Remove inner plastic bag liner (Landfill/Film Drop-Off) and flatten box.',
+    mrfImpactNote: 'Leaving inner wax/plastic liners inside flattened boxes degrades boxboard bales.',
+    keywords: ['cereal', 'cracker box', 'pasta box', 'paperboard', 'tissue box'],
+  },
+  {
+    id: 'bubble-mailer',
+    name: 'Bubble-Lined Paper Shipping Mailer',
+    materialClass: 'contaminated_film',
+    resinOrCode: 'C/PAP + LDPE',
+    defaultBin: 'landfill',
+    avgWeightKg: 0.045,
+    co2eSavedKg: 0.02,
+    wishCyclingRisk: 'high',
+    prepSteps: 'Reuse for outgoing packages! Mixed paper+plastic bubble mailers go to Landfill (all-plastic poly mailers go to Store Film Drop-Off).',
+    mrfImpactNote: 'Glued plastic bubble wrap fused inside kraft paper cannot be separated in either paper pulpers or plastic film recyclers.',
+    keywords: ['mailer', 'padded envelope', 'bubble wrap', 'amazon envelope'],
+  },
+];
+
+export function getMunicipality(id: MunicipalityId): MunicipalityProfile {
+  return MUNICIPALITIES.find((m) => m.id === id) ?? MUNICIPALITIES[0];
+}
+
+export function resolveItemRule(item: WasteItemRule, cityId: MunicipalityId): ResolvedWasteRule {
+  const city = getMunicipality(cityId);
+  const override = item.cityOverrides?.[cityId];
+  const bin: BinCategory = override?.bin ?? item.defaultBin;
+  return {
+    item,
+    city,
+    bin,
+    binLabel: city.binLabels[bin],
+    citySpecificNote: override?.note ?? null,
+  };
+}
+
+export function getItemById(id: string): WasteItemRule {
+  return WASTE_ITEMS.find((i) => i.id === id) ?? WASTE_ITEMS[0];
+}
+
+export function searchWasteItems(
+  query: string,
+  filterBin: BinCategory | 'all',
+  cityId: MunicipalityId
+): ResolvedWasteRule[] {
+  const q = query.trim().toLowerCase();
+  return WASTE_ITEMS.map((item) => resolveItemRule(item, cityId)).filter((resolved) => {
+    if (filterBin !== 'all' && resolved.bin !== filterBin) return false;
+    if (!q) return true;
+    const { item } = resolved;
+    return (
+      item.name.toLowerCase().includes(q) ||
+      item.resinOrCode.toLowerCase().includes(q) ||
+      item.materialClass.toLowerCase().includes(q) ||
+      item.keywords.some((k) => k.toLowerCase().includes(q))
+    );
+  });
+}
+
+export function getBinColor(bin: BinCategory): string {
+  switch (bin) {
+    case 'recycle':
+      return '#38BDF8';
+    case 'compost':
+      return '#10B981';
+    case 'landfill':
+      return '#94A3B8';
+    case 'hazardous':
+      return '#F43F5E';
+    case 'dropoff':
+      return '#F59E0B';
+  }
+}
